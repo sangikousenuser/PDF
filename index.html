@@ -3,6 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <title>PDF小冊子作成</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"], button, label {
+            display: block;
+            margin: 10px 0;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 5px;
+        }
+
+        label {
+            font-size: 16px;
+            color: #555;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: white;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #downloadLink, .additional-link {
+            margin-top: 15px;
+            font-size: 16px;
+            color: #007bff;
+            text-decoration: none;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        #downloadLink.show, .additional-link.show {
+            display: block;
+            opacity: 1;
+        }
+    </style>
 </head>
 <body>
     <h1>PDF小冊子作成</h1>
@@ -14,7 +76,7 @@
         <input type="checkbox" id="mergeBooklets"> おもてと裏を統合
     </label>
     <button onclick="createBooklet()">小冊子PDFを作成</button>
-    <a id="downloadLink" style="display:none;">ダウンロード</a>
+    <a id="downloadLink" class="download-link">ダウンロード</a>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script>
@@ -116,7 +178,7 @@
                     const finalUrl = URL.createObjectURL(finalBlob);
 
                     downloadLink.href = finalUrl;
-                    downloadLink.style.display = 'block';
+                    downloadLink.classList.add('show');
                     downloadLink.download = `${originalFileName}[統合].pdf`;
                     downloadLink.textContent = '統合された小冊子PDFをダウンロード';
 
@@ -131,13 +193,13 @@
                     const backUrl = URL.createObjectURL(backBlob);
 
                     downloadLink.href = frontUrl;
-                    downloadLink.style.display = 'block';
+                    downloadLink.classList.add('show');
                     downloadLink.download = `${originalFileName}[おもて].pdf`;
                     downloadLink.textContent = 'おもてPDFをダウンロード';
 
                     const backLink = document.createElement('a');
                     backLink.href = backUrl;
-                    backLink.style.display = 'block';
+                    backLink.classList.add('additional-link', 'show');
                     backLink.download = `${originalFileName}[うら].pdf`;
                     backLink.textContent = '裏PDFをダウンロード';
                     document.body.appendChild(backLink);
