@@ -31,6 +31,7 @@
 
             try {
                 const file = fileInput.files[0];
+                const originalFileName = file.name.replace(/\.[^/.]+$/, "");
                 const arrayBuffer = await file.arrayBuffer();
                 const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
 
@@ -94,10 +95,9 @@
                     pages.forEach(page => page.setGrayScaleColor());
                 }
 
-                let finalPdfBytes;
                 if (mergeBooklets) {
                     const mergedPdf = await PDFLib.PDFDocument.create();
-                    
+
                     const frontPdfBytes = await bookletFront.save();
                     const backPdfBytes = await bookletBack.save();
 
@@ -110,7 +110,16 @@
                     frontPages.forEach(page => mergedPdf.addPage(page));
                     backPages.forEach(page => mergedPdf.addPage(page));
 
-                    finalPdfBytes = await mergedPdf.save();
+                    const finalPdfBytes = await mergedPdf.save();
+
+                    const finalBlob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+                    const finalUrl = URL.createObjectURL(finalBlob);
+
+                    downloadLink.href = finalUrl;
+                    downloadLink.style.display = 'block';
+                    downloadLink.download = `${originalFileName}[統合].pdf`;
+                    downloadLink.textContent = '統合された小冊子PDFをダウンロード';
+
                 } else {
                     const frontPdfBytes = await bookletFront.save();
                     const backPdfBytes = await bookletBack.save();
@@ -123,25 +132,16 @@
 
                     downloadLink.href = frontUrl;
                     downloadLink.style.display = 'block';
-                    downloadLink.download = 'booklet_front.pdf';
+                    downloadLink.download = `${originalFileName}[おもて].pdf`;
                     downloadLink.textContent = 'おもてPDFをダウンロード';
 
                     const backLink = document.createElement('a');
                     backLink.href = backUrl;
                     backLink.style.display = 'block';
-                    backLink.download = '裏PDFをダウンロード';
+                    backLink.download = `${originalFileName}[うら].pdf`;
                     backLink.textContent = '裏PDFをダウンロード';
                     document.body.appendChild(backLink);
-                    return;
                 }
-
-                const finalBlob = new Blob([finalPdfBytes], { type: 'application/pdf' });
-                const finalUrl = URL.createObjectURL(finalBlob);
-
-                downloadLink.href = finalUrl;
-                downloadLink.style.display = 'block';
-                downloadLink.download = 'booklet_merged.pdf';
-                downloadLink.textContent = '統合された小冊子PDFをダウンロード';
 
             } catch (error) {
                 console.error("エラーが発生しました:", error);
