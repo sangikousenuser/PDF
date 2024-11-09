@@ -1,11 +1,153 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <title>ここにタイトルを入力</title>
-  <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <title>PDF小冊子作成</title>
 </head>
 <body>
-  <h1>はじめてのHTML入門</h1>
-  <p>HTMLの書き方について学ぼう</p>
+    <h1>PDF小冊子作成</h1>
+    <input type="file" id="pdfUpload" accept="application/pdf">
+    <label>
+        <input type="checkbox" id="monochrome"> モノクロ専用モード
+    </label>
+    <label>
+        <input type="checkbox" id="mergeBooklets"> おもてと裏を統合
+    </label>
+    <button onclick="createBooklet()">小冊子PDFを作成</button>
+    <a id="downloadLink" style="display:none;">ダウンロード</a>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script>
+        async function createBooklet() {
+            const fileInput = document.getElementById('pdfUpload');
+            const downloadLink = document.getElementById('downloadLink');
+            const monochrome = document.getElementById('monochrome').checked;
+            const mergeBooklets = document.getElementById('mergeBooklets').checked;
+
+            if (fileInput.files.length === 0) {
+                alert('PDFファイルをアップロードしてください');
+                return;
+            }
+
+            try {
+                const file = fileInput.files[0];
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+
+                const pageCount = pdfDoc.getPageCount();
+
+                if (pageCount % 4 !== 0) {
+                    alert('ページ数が4の倍数である必要があります');
+                    return;
+                }
+
+                const maxPages = Math.floor(pageCount / 4);
+
+                const bookletFront = await PDFLib.PDFDocument.create();
+                const bookletBack = await PDFLib.PDFDocument.create();
+
+                const pageWidth = pdfDoc.getPage(0).getWidth();
+                const pageHeight = pdfDoc.getPage(0).getHeight();
+
+                for (let i = 0; i < Math.ceil(pageCount / 2); i++) {
+                    const frontPage = bookletFront.addPage([pageWidth * 2, pageHeight]);
+                    const backPage = bookletBack.addPage([pageWidth * 2, pageHeight]);
+
+                    const frontLeftIndex = pageCount - 1 - i * 2;
+                    const frontRightIndex = i * 2;
+                    const backLeftIndex = i * 2 + 1;
+                    const backRightIndex = pageCount - 2 - i * 2;
+
+                    if (frontLeftIndex >= 0 && frontLeftIndex < pageCount) {
+                        const embeddedFrontLeftPage = await bookletFront.embedPage(pdfDoc.getPage(frontLeftIndex));
+                        frontPage.drawPage(embeddedFrontLeftPage, { x: 0, y: 0 });
+                    }
+
+                    if (frontRightIndex >= 0 && frontRightIndex < pageCount) {
+                        const embeddedFrontRightPage = await bookletFront.embedPage(pdfDoc.getPage(frontRightIndex));
+                        frontPage.drawPage(embeddedFrontRightPage, { x: pageWidth, y: 0 });
+                    }
+
+                    if (backLeftIndex >= 0 && backLeftIndex < pageCount) {
+                        const embeddedBackLeftPage = await bookletBack.embedPage(pdfDoc.getPage(backLeftIndex));
+                        backPage.drawPage(embeddedBackLeftPage, { x: 0, y: 0 });
+                    }
+
+                    if (backRightIndex >= 0 && backRightIndex < pageCount) {
+                        const embeddedBackRightPage = await bookletBack.embedPage(pdfDoc.getPage(backRightIndex));
+                        backPage.drawPage(embeddedBackRightPage, { x: pageWidth, y: 0 });
+                    }
+                }
+
+                const deleteExcessPages = async (doc, max) => {
+                    const docPageCount = doc.getPageCount();
+                    for (let i = docPageCount - 1; i >= max; i--) {
+                        doc.removePage(i);
+                    }
+                };
+
+                await deleteExcessPages(bookletFront, maxPages);
+                await deleteExcessPages(bookletBack, maxPages);
+
+                if (monochrome) {
+                    const pages = [...bookletFront.getPages(), ...bookletBack.getPages()];
+                    pages.forEach(page => page.setGrayScaleColor());
+                }
+
+                let finalPdfBytes;
+                if (mergeBooklets) {
+                    const mergedPdf = await PDFLib.PDFDocument.create();
+                    
+                    const frontPdfBytes = await bookletFront.save();
+                    const backPdfBytes = await bookletBack.save();
+
+                    const loadedFrontPdf = await PDFLib.PDFDocument.load(frontPdfBytes);
+                    const loadedBackPdf = await PDFLib.PDFDocument.load(backPdfBytes);
+
+                    const frontPages = await mergedPdf.copyPages(loadedFrontPdf, loadedFrontPdf.getPageIndices());
+                    const backPages = await mergedPdf.copyPages(loadedBackPdf, loadedBackPdf.getPageIndices());
+
+                    frontPages.forEach(page => mergedPdf.addPage(page));
+                    backPages.forEach(page => mergedPdf.addPage(page));
+
+                    finalPdfBytes = await mergedPdf.save();
+                } else {
+                    const frontPdfBytes = await bookletFront.save();
+                    const backPdfBytes = await bookletBack.save();
+
+                    const frontBlob = new Blob([frontPdfBytes], { type: 'application/pdf' });
+                    const backBlob = new Blob([backPdfBytes], { type: 'application/pdf' });
+
+                    const frontUrl = URL.createObjectURL(frontBlob);
+                    const backUrl = URL.createObjectURL(backBlob);
+
+                    downloadLink.href = frontUrl;
+                    downloadLink.style.display = 'block';
+                    downloadLink.download = 'booklet_front.pdf';
+                    downloadLink.textContent = 'おもてPDFをダウンロード';
+
+                    const backLink = document.createElement('a');
+                    backLink.href = backUrl;
+                    backLink.style.display = 'block';
+                    backLink.download = '裏PDFをダウンロード';
+                    backLink.textContent = '裏PDFをダウンロード';
+                    document.body.appendChild(backLink);
+                    return;
+                }
+
+                const finalBlob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+                const finalUrl = URL.createObjectURL(finalBlob);
+
+                downloadLink.href = finalUrl;
+                downloadLink.style.display = 'block';
+                downloadLink.download = 'booklet_merged.pdf';
+                downloadLink.textContent = '統合された小冊子PDFをダウンロード';
+
+            } catch (error) {
+                console.error("エラーが発生しました:", error);
+                alert("エラーが発生しました: " + error.message);
+            }
+        }
+    </script>
 </body>
 </html>
